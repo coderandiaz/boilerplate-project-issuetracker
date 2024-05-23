@@ -1,9 +1,25 @@
 'use strict';
-const { v1: uuidv1 } = require('uuid');
+const { ObjectId } = require("mongoose").Types;
 
 module.exports = function (app) {
 
   const data = [];
+  function shallowEqual(object1, object2) {
+    const keys1 = Object.keys(object1);
+    const keys2 = Object.keys(object2);
+  
+    if (keys1.length !== keys2.length) {
+      return false;
+    }
+  
+    for (let key of keys1) {
+      if (object1[key] !== object2[key]) {
+        return false;
+      }
+    }
+  
+    return true;
+  }
   
   function filteringCustom(item, possibleFilters, project) {
     const open = possibleFilters.open;
@@ -65,13 +81,13 @@ module.exports = function (app) {
       res.send({ error: 'required field(s) missing' })
     }
 
-    const newId = uuidv1();
+    const newId = new ObjectId()
     const newIssue = {
       "_id": newId,
       "project": project,
       "open": !open ? true : open,
-      "issue_title": issue_title,
-      "issue_text": issue_text,
+      "issue_title": !issue_title ? "" : issue_title,
+      "issue_text": !issue_text ? "" : issue_text,
       "created_by": created_by,
       "assigned_to": !assigned_to ? "" : assigned_to,
       "status_text": !status_text ? "" : status_text,
@@ -87,18 +103,19 @@ module.exports = function (app) {
     let project = req.params.project;
     let _id = req.body._id;
 
+
+    const issue_title = req.body.issue_title;
+    const issue_text = req.body.issue_text;
+    const created_by = req.body.created_by;
+    const assigned_to = req.body.assigned_to;
+    const status_text = req.body.status_text;
+    const closing = req.body.open;
+
     try {
       if (!_id) {
         res.send({ error: 'missing _id' })
         return
       }
-
-      const issue_title = req.body.issue_title;
-      const issue_text = req.body.issue_text;
-      const created_by = req.body.created_by;
-      const assigned_to = req.body.assigned_to;
-      const status_text = req.body.status_text;
-      const closing = req.body.open;
 
       if (!issue_title && !issue_text && !created_by && !assigned_to && !status_text && !closing) {
         res.send({ error: 'no update field(s) sent', '_id': _id });
@@ -109,28 +126,35 @@ module.exports = function (app) {
         item._id == _id && item.project == project
       });
 
-      if(issue_title) {
+      const originalItem = [...item];
+
+      if(issue_title && issue_title != item["issue_title"]) {
         item["issue_title"] = issue_title;
       }
 
-      if(issue_text) {
+      if(issue_text && issue_text != item["issue_text"]) {
         item["issue_text"] = issue_text;
       }
 
-      if(created_by) {
+      if(created_by && created_by != item["created_by"]) {
         item["created_by"] = created_by;
       }
 
-      if(assigned_to) {
+      if(assigned_to && assigned_to != item["assigned_to"]) {
         item["assigned_to"] = assigned_to;
       }
 
-      if(status_text) {
+      if(status_text && status_text != item["status_text"]) {
         item["status_text"] = status_text;
       }
 
-      if(closing) {
+      if(closing && closing != item["closing"]) {
         item["open"] = false;
+      }
+
+      if (shallowEqual(item, originalItem)) {
+        throw new Error("We didnt update shit wtf.");
+        return
       }
 
       item["updated_on"] = new Date();
@@ -150,20 +174,24 @@ module.exports = function (app) {
       if (!_id) {
         res.send({ error: 'missing _id'});
       }
-      
+      console.log(_id);
       // Suppose we want to remove the item with index 2 ('cherry')
-      let indexToRemove = items.findIndex(obj => obj._id === _id && obj.project == obj.project);
-
-      items.splice(indexToRemove, 1);
+      let indexToRemove = data.findIndex(obj => obj._id === _id && obj.project == project);
+      console.log(indexToRemove)
+      data.splice(indexToRemove, 1);
+      console.log("DATA: ", data)
 
       // Update indices for all items following the removed one
-      for (let i = indexToRemove; i < items.length; i++) {
-        items[i].index = i;
+      for (let i = indexToRemove; i < data.length; i++) {
+        if (data && "index" in data[i]) {
+          data[i]["index"] = i;
+        }
       }
 
       res.send({ result: 'successfully deleted', '_id': _id });
     } catch (e) {
       // TODO: NEXT STEP IS TO PRINT THE ERRORS FROM CATCH AND FIGURE OUT WHY ITS NOT WORKING.
+      console.log(e)
       res.send({ error: 'could not delete', '_id': _id })
     }
   });
