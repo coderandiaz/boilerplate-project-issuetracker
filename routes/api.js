@@ -3,15 +3,50 @@ const { v1: uuidv1 } = require('uuid');
 
 module.exports = function (app) {
 
-  const data = [0, 1, 2, 3];
+  const data = [];
   
+  function filteringCustom(item, possibleFilters, project) {
+    const open = possibleFilters.open;
+    const assigned_to = possibleFilters.assigned_to
+    const issue_title = possibleFilters.issue_title;
+    const issue_text = possibleFilters.issue_text;
+    const created_on = possibleFilters.created_on;
+    const updated_on = possibleFilters.updated_on;
+    const created_by = possibleFilters.created_by;
+    const status_text = possibleFilters.status_text;
+
+    let filteringCriteria = item.project == project;
+    if (open) {
+      filteringCriteria = filteringCriteria && item.open == open;
+    }
+    if (assigned_to) {
+      filteringCriteria = filteringCriteria && item.assigned_to == assigned_to;
+    }
+    if (issue_title) {
+      filteringCriteria = filteringCriteria && item.issue_title == issue_title;
+    }
+    if (issue_text) {
+      filteringCriteria = filteringCriteria && item.issue_text == issue_text;
+    }
+    if (created_on) {
+      filteringCriteria = filteringCriteria && item.created_on == created_on;
+    }
+    if (updated_on) {
+      filteringCriteria = filteringCriteria && item.updated_on == updated_on;
+    }
+    if (created_by) {
+      filteringCriteria = filteringCriteria && item.created_by == created_by;
+    }
+    if (status_text) {
+      filteringCriteria = filteringCriteria && item.status_text == status_text;
+    }
+    return filteringCriteria
+  }
 
   app.route('/api/issues/:project').get(function (req, res){
       const project = req.params.project;
-      const open = req.query.open;
-
       res.send(
-        data.filter((item) => item.project == project && item.open == open)
+        data.filter((item) => filteringCustom(item, req.query, project))
       );
   })
     
@@ -51,10 +86,11 @@ module.exports = function (app) {
   app.route('/api/issues/:project').put(function (req, res){
     let project = req.params.project;
     let _id = req.body._id;
-    try {
 
+    try {
       if (!_id) {
         res.send({ error: 'missing _id' })
+        return
       }
 
       const issue_title = req.body.issue_title;
@@ -62,9 +98,11 @@ module.exports = function (app) {
       const created_by = req.body.created_by;
       const assigned_to = req.body.assigned_to;
       const status_text = req.body.status_text;
+      const closing = req.body.open;
 
-      if (!issue_title && !issue_text && !created_by && !assigned_to && !status_text) {
+      if (!issue_title && !issue_text && !created_by && !assigned_to && !status_text && !closing) {
         res.send({ error: 'no update field(s) sent', '_id': _id });
+        return
       }
 
       const item = data.filter((item) => {
@@ -91,11 +129,16 @@ module.exports = function (app) {
         item["status_text"] = status_text;
       }
 
+      if(closing) {
+        item["open"] = false;
+      }
+
       item["updated_on"] = new Date();
       data[item["index"]] = item;
       res.send({ result: 'successfully updated', '_id': _id });
     } catch (e) {
       // TODO: NEXT STEP IS TO PRINT THE ERRORS FROM CATCH AND FIGURE OUT WHY ITS NOT WORKING.
+      console.log(e)
       res.send({ error: 'could not update', '_id': _id })
     }
   })
